@@ -11,7 +11,7 @@ import (
 	"xteve/internal/xepg"
 )
 
-const version = "3.0.0"
+const version = "2.0.0"
 
 // Config holds the dependencies for the API handler.
 type Config struct {

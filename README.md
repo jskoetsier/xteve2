@@ -1,4 +1,4 @@
-# xTeVe 3
+# xTeVe 2
 
 An M3U proxy server that bridges IPTV streams with **Plex DVR** and **Emby Live TV**. xTeVe presents itself as an HDHomeRun network tuner, merges M3U playlists and XMLTV EPG feeds, and re-streams channels through configurable buffer backends.
 
@@ -188,6 +188,12 @@ Run tests:
 ```bash
 go test ./...
 ```
+
+---
+
+## Credits
+
+xTeVe 2 is a full rewrite of the original [xTeVe](https://github.com/xteve-project/xTeVe) project, created by [marmei](https://github.com/marmei). The core concept — M3U proxy with HDHomeRun emulation for Plex and Emby — is entirely their work. This repo modernises the codebase (Go 1.24, React frontend, new internal package structure) while preserving all the functionality they built.
 
 ---
 
