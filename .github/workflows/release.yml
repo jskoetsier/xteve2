@@ -1,0 +1,149 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-web:
+    name: Build React frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: cd web && npm ci
+
+      - name: Build
+        run: cd web && npm run build
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: internal/ui/dist/
+
+  build-binaries:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: build-web
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            asset: xteve_linux_amd64
+          - goos: linux
+            goarch: arm64
+            asset: xteve_linux_arm64
+          - goos: darwin
+            goarch: amd64
+            asset: xteve_darwin_amd64
+          - goos: darwin
+            goarch: arm64
+            asset: xteve_darwin_arm64
+          - goos: windows
+            goarch: amd64
+            asset: xteve_windows_amd64.exe
+          - goos: freebsd
+            goarch: amd64
+            asset: xteve_freebsd_amd64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Download web dist
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: internal/ui/dist/
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        run: |
+          go build \
+            -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+            -o ${{ matrix.asset }} \
+            ./cmd/xteve/
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+
+  release:
+    name: Create GitHub Release
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: xteve_*
+          path: dist/
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum * > checksums.txt
+          cat checksums.txt
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: xTeVe ${{ github.ref_name }}
+          body: |
+            ## xTeVe ${{ github.ref_name }}
+
+            ### Downloads
+
+            | Platform | Architecture | File |
+            |----------|-------------|------|
+            | Linux | x86-64 | `xteve_linux_amd64` |
+            | Linux | ARM64 | `xteve_linux_arm64` |
+            | macOS | x86-64 | `xteve_darwin_amd64` |
+            | macOS | Apple Silicon | `xteve_darwin_arm64` |
+            | Windows | x86-64 | `xteve_windows_amd64.exe` |
+            | FreeBSD | x86-64 | `xteve_freebsd_amd64` |
+
+            ### Quick start
+
+            ```bash
+            # Linux x86-64
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/xteve_linux_amd64 -o xteve
+            chmod +x xteve
+            ./xteve
+            ```
+
+            `checksums.txt` contains SHA-256 hashes for all binaries.
+          files: |
+            dist/xteve_linux_amd64
+            dist/xteve_linux_arm64
+            dist/xteve_darwin_amd64
+            dist/xteve_darwin_arm64
+            dist/xteve_windows_amd64.exe
+            dist/xteve_freebsd_amd64
+            dist/checksums.txt
+          draft: false
+          prerelease: false
