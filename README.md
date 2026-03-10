@@ -1,3 +1,7 @@
+<div align="center">
+    <img src="xteve2.png" alt="xTeVe" />
+</div>
+
 # xTeVe 2
 
 An M3U proxy server that bridges IPTV streams with **Plex DVR** and **Emby Live TV**. xTeVe presents itself as an HDHomeRun network tuner, merges M3U playlists and XMLTV EPG feeds, and re-streams channels through configurable buffer backends.
