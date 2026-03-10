@@ -1,0 +1,11 @@
+.DS_Store
+.worktrees/
+demo
+dev
+compiler
+files
+update_xteve*.sh
+/xteve
+/xteve.exe
+de.jsonweb/dist/
+web/node_modules/

@@ -1,0 +1,12 @@
+services:
+  xteve:
+    build: .
+    image: xteve:latest
+    container_name: xteve
+    restart: unless-stopped
+    ports:
+      - "34400:34400"
+    volumes:
+      - ./config:/config
+    environment:
+      - TZ=UTC

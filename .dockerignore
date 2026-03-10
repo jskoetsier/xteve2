@@ -1,0 +1,8 @@
+src/
+node_modules/
+web/node_modules/
+*.md
+docs/
+.git/
+.worktrees/
+internal/ui/dist/
