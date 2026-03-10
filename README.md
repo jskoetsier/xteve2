@@ -191,6 +191,18 @@ go test ./...
 
 ---
 
+## Contributing
+
+Contributions are welcome — ideas, bug reports, and code alike.
+
+- **Have a suggestion or found a bug?** Open an [issue](../../issues) — no idea is too small.
+- **Want to contribute code?** Fork the repo, make your changes, and open a pull request. AI-assisted coding is completely fine — use whatever tools help you write good code.
+- **Not sure where to start?** Browse the open issues or check the architecture section above to understand the codebase.
+
+There's no formal process. If the change makes sense, it gets merged.
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
