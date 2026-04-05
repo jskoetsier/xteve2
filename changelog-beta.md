@@ -1,3 +1,14 @@
+#### 2.1.0
+```diff
++ Modern admin dashboard UI redesign
++ Full EPG management page with channel mapping and program guide
++ Full Playlist management page with M3U/XMLTV URL configuration
++ XMLTV parsing for EPG data import
++ API endpoints for playlist refresh, EPG refresh, and channel mapping
++ Fixed JSON tags on m3u.Channel struct
++ Fixed xepg.Entry fields with omitempty removed for mapping fields
+```
+
 #### 2.1.1.0116-beta
 If no user agent is specified, the default FFmpeg or VLC user agent is used.
 

@@ -23,7 +23,7 @@ import (
 	"xteve/internal/xepg"
 )
 
-var version = "2.0.0"
+var version = "2.1.0"
 
 func main() {
 	var (
