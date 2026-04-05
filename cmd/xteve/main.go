@@ -18,6 +18,7 @@ import (
 	"xteve/internal/hdhr"
 	"xteve/internal/ssdp"
 	"xteve/internal/storage"
+	"xteve/internal/source"
 	"xteve/internal/ui"
 	"xteve/internal/xepg"
 )
@@ -45,9 +46,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
+	cfg = config.ApplyEnvOverrides(cfg)
 	if *port != 34400 {
 		cfg.Port = *port
 	}
+
+	publicBaseURL := envOrDefault("XTEVE_BASE_URL", fmt.Sprintf("http://localhost:%d", cfg.Port))
 
 	authSvc := auth.New(auth.Config{
 		Enabled:      cfg.AuthEnabled,
@@ -66,14 +70,25 @@ func main() {
 	hdhrHandler := hdhr.New(hdhr.Config{
 		DeviceID:   "xteve1234",
 		TunerCount: cfg.TunerCount,
-		BaseURL:    fmt.Sprintf("http://localhost:%d", cfg.Port),
+		BaseURL:    publicBaseURL,
 	})
+
+	sourceManager := source.NewManager(cfg, xepgDB, hdhrHandler, buf, publicBaseURL)
 
 	apiHandler := api.New(api.Config{
 		Storage:  store,
 		Settings: cfg,
 		XEPG:     xepgDB,
 		Buffer:   buf,
+		OnSettingsChanged: func(updated config.Settings) {
+			sourceManager.UpdateSettings(config.ApplyEnvOverrides(updated))
+			if err := sourceManager.RefreshPlaylist(context.Background()); err != nil {
+				log.Printf("source: refresh after settings update failed: %v", err)
+			}
+		},
+		OnChannelsChanged: func() {
+			sourceManager.SyncLineup()
+		},
 	})
 
 	mux := http.NewServeMux()
@@ -83,6 +98,9 @@ func main() {
 	mux.HandleFunc("/lineup.json", hdhrHandler.ServeLineup)
 	mux.HandleFunc("/lineup_status.json", hdhrHandler.ServeLineupStatus)
 	mux.HandleFunc("/device.xml", hdhrHandler.ServeDeviceXML)
+	mux.HandleFunc("GET /m3u/", sourceManager.ServeM3U)
+	mux.HandleFunc("GET /xmltv/", sourceManager.ServeXMLTV)
+	mux.HandleFunc("GET /stream/{id}", sourceManager.ServeStream)
 
 	// API (auth-protected)
 	mux.Handle("/api/", authSvc.Middleware(apiHandler.Router()))
@@ -106,6 +124,8 @@ func main() {
 		}
 	}()
 
+	sourceManager.Start(ctx)
+
 	log.Printf("xTeVe %s listening on %s", version, addr)
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -125,4 +145,11 @@ func defaultConfigDir() string {
 
 func serveUI() http.Handler {
 	return ui.Handler()
+}
+
+func envOrDefault(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
 }

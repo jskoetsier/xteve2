@@ -1,12 +1,16 @@
 services:
   xteve:
     build: .
-    image: xteve:latest
-    container_name: xteve
+    image: xteve2:latest
+    container_name: xteve2
     restart: unless-stopped
     ports:
       - "34400:34400"
     volumes:
       - ./config:/config
     environment:
-      - TZ=UTC
+      - TZ=Europe/Amsterdam
+      - XTEVE_BASE_URL=${XTEVE_BASE_URL:-http://localhost:34400}
+      - XTEVE_M3U_URL=${XTEVE_M3U_URL:-http://host.docker.internal:8000/api/v1/channels/m3u/playlist}
+      - XTEVE_XMLTV_URL=${XTEVE_XMLTV_URL:-http://host.docker.internal:8000/api/v1/epg/xmltv}
+      - XTEVE_M3U_REFRESH_MINS=${XTEVE_M3U_REFRESH_MINS:-15}

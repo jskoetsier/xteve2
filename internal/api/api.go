@@ -2,11 +2,13 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
 	"xteve/internal/buffer"
 	"xteve/internal/config"
+	"xteve/internal/source"
 	"xteve/internal/storage"
 	"xteve/internal/xepg"
 )
@@ -15,10 +17,13 @@ const version = "2.0.0"
 
 // Config holds the dependencies for the API handler.
 type Config struct {
-	Storage  *storage.Storage
-	Settings config.Settings
-	XEPG     *xepg.DB
-	Buffer   *buffer.Buffer
+	Storage           *storage.Storage
+	Settings          config.Settings
+	XEPG              *xepg.DB
+	Buffer            *buffer.Buffer
+	SourceManager     *source.Manager
+	OnSettingsChanged func(config.Settings)
+	OnChannelsChanged func()
 }
 
 // API is the HTTP API handler.
@@ -54,6 +59,10 @@ func (a *API) registerRoutes() {
 	a.mux.HandleFunc("PUT /api/v1/channels/{id}", a.handleChannelPut)
 	a.mux.HandleFunc("POST /api/v1/auth/login", a.handleLogin)
 	a.mux.HandleFunc("POST /api/v1/auth/logout", a.handleLogout)
+	a.mux.HandleFunc("POST /api/v1/playlists/refresh", a.handlePlaylistRefresh)
+	a.mux.HandleFunc("POST /api/v1/epg/refresh", a.handleEPGRefresh)
+	a.mux.HandleFunc("GET /api/v1/epg/programs", a.handleEPGPrograms)
+	a.mux.HandleFunc("PUT /api/v1/channels/{id}/mapping", a.handleChannelMapping)
 	a.mux.Handle("/ws", a.hub)
 }
 
@@ -90,6 +99,10 @@ func (a *API) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	a.cfg.Settings = updated
+	if a.cfg.OnSettingsChanged != nil {
+		a.cfg.OnSettingsChanged(updated)
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -108,6 +121,9 @@ func (a *API) handleChannelPut(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+	if a.cfg.OnChannelsChanged != nil {
+		a.cfg.OnChannelsChanged()
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -118,4 +134,75 @@ func (a *API) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) handleLogout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
+}
+
+func (a *API) handlePlaylistRefresh(w http.ResponseWriter, r *http.Request) {
+	if a.cfg.SourceManager == nil {
+		http.Error(w, "source manager not configured", http.StatusServiceUnavailable)
+		return
+	}
+	if err := a.cfg.SourceManager.RefreshPlaylist(context.Background()); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "ok"})
+}
+
+func (a *API) handleEPGRefresh(w http.ResponseWriter, r *http.Request) {
+	if a.cfg.SourceManager == nil {
+		http.Error(w, "source manager not configured", http.StatusServiceUnavailable)
+		return
+	}
+	if err := a.cfg.SourceManager.RefreshEPG(context.Background()); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "ok"})
+}
+
+func (a *API) handleEPGPrograms(w http.ResponseWriter, r *http.Request) {
+	channelID := r.URL.Query().Get("channel_id")
+	if channelID == "" {
+		http.Error(w, "channel_id is required", http.StatusBadRequest)
+		return
+	}
+	programs := a.cfg.XEPG.ProgramsFor(channelID)
+	writeJSON(w, programs)
+}
+
+type channelMappingRequest struct {
+	CustomName string  `json:"custom_name"`
+	EPGChannel string  `json:"epg_channel"`
+	ChannelNum float64 `json:"channel_num"`
+}
+
+func (a *API) handleChannelMapping(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var req channelMappingRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.CustomName != "" {
+		if !a.cfg.XEPG.SetCustomName(id, req.CustomName) {
+			http.Error(w, "channel not found", http.StatusNotFound)
+			return
+		}
+	}
+	if req.EPGChannel != "" {
+		if !a.cfg.XEPG.SetEPGChannel(id, req.EPGChannel) {
+			http.Error(w, "channel not found", http.StatusNotFound)
+			return
+		}
+	}
+	if req.ChannelNum > 0 {
+		if !a.cfg.XEPG.SetChannelNum(id, req.ChannelNum) {
+			http.Error(w, "channel not found", http.StatusNotFound)
+			return
+		}
+	}
+	if a.cfg.OnChannelsChanged != nil {
+		a.cfg.OnChannelsChanged()
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

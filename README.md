@@ -53,6 +53,9 @@ docker run -d \
   --name xteve \
   -p 34400:34400 \
   -v ~/.xteve:/config \
+  -e XTEVE_BASE_URL=http://localhost:34400 \
+  -e XTEVE_M3U_URL=http://iptv2emby:8000/api/v1/channels/m3u/playlist \
+  -e XTEVE_XMLTV_URL=http://iptv2emby:8000/api/v1/epg/xmltv \
   ghcr.io/jskoetsier/xteve2:latest
 ```
 
@@ -155,6 +158,17 @@ Config is stored in `~/.xteve/settings.json` (or the directory passed via `-conf
 | `buffer_type` | `"hls"` | `"hls"`, `"ffmpeg"`, or `"vlc"` |
 | `ffmpeg_path` | `/usr/bin/ffmpeg` | Path to FFmpeg binary |
 | `auth_enabled` | `false` | Enable password protection |
+| `m3u_url` | `""` | Upstream M3U playlist source |
+| `xmltv_url` | `""` | Upstream XMLTV source |
+| `m3u_refresh_mins` | `15` | Playlist refresh interval |
+
+Environment variables can seed these runtime values without writing them into
+`settings.json` first:
+
+- `XTEVE_BASE_URL`
+- `XTEVE_M3U_URL`
+- `XTEVE_XMLTV_URL`
+- `XTEVE_M3U_REFRESH_MINS`
 
 ---
 

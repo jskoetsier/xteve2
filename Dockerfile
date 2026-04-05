@@ -12,7 +12,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-COPY --from=web-builder /app/web/dist ./internal/ui/dist
+COPY --from=web-builder /app/internal/ui/dist ./internal/ui/dist
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o xteve ./cmd/xteve/
 
 # Stage 3: Minimal runtime

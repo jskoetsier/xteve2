@@ -5,10 +5,10 @@ import { api } from '@/lib/api'
 export default function Settings() {
   const qc = useQueryClient()
   const { data, isLoading } = useQuery({ queryKey: ['settings'], queryFn: api.getSettings })
-  const [form, setForm] = useState<Record<string, unknown>>({})
+  const [form, setForm] = useState<Partial<Record<string, unknown>>>({})
 
   useEffect(() => {
-    if (data) setForm(data)
+    if (data) setForm(data as unknown as Partial<Record<string, unknown>>)
   }, [data])
 
   const save = useMutation({

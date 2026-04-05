@@ -2,6 +2,9 @@
 package config
 
 import (
+	"os"
+	"strconv"
+
 	"xteve/internal/storage"
 )
 
@@ -17,6 +20,9 @@ type Settings struct {
 	VLCPath        string `json:"vlc_path"`
 	BufferType     string `json:"buffer_type"` // "ffmpeg", "vlc", "hls"
 	EPGRefreshHour int    `json:"epg_refresh_hour"`
+	M3UURL         string `json:"m3u_url,omitempty"`
+	XMLTVURL       string `json:"xmltv_url,omitempty"`
+	M3URefreshMins int    `json:"m3u_refresh_mins"`
 }
 
 // Default returns a Settings with sensible defaults.
@@ -28,6 +34,7 @@ func Default() Settings {
 		FFmpegPath:     "/usr/bin/ffmpeg",
 		BufferType:     "hls",
 		EPGRefreshHour: 4,
+		M3URefreshMins: 15,
 	}
 }
 
@@ -44,4 +51,23 @@ func Load(s *storage.Storage) (Settings, error) {
 // Save writes settings to storage.
 func Save(s *storage.Storage, cfg Settings) error {
 	return s.Save(filename, cfg)
+}
+
+// ApplyEnvOverrides fills runtime-configurable values from environment variables.
+// Existing persisted settings win unless the field is empty or zero-valued.
+func ApplyEnvOverrides(cfg Settings) Settings {
+	if cfg.M3UURL == "" {
+		cfg.M3UURL = os.Getenv("XTEVE_M3U_URL")
+	}
+	if cfg.XMLTVURL == "" {
+		cfg.XMLTVURL = os.Getenv("XTEVE_XMLTV_URL")
+	}
+	if cfg.M3URefreshMins == 0 {
+		if value := os.Getenv("XTEVE_M3U_REFRESH_MINS"); value != "" {
+			if mins, err := strconv.Atoi(value); err == nil && mins > 0 {
+				cfg.M3URefreshMins = mins
+			}
+		}
+	}
+	return cfg
 }
