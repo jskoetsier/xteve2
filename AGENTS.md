@@ -6,96 +6,86 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 xTeVe is an M3U proxy server that bridges streaming services with Plex DVR and Emby Live TV. It merges M3U playlists and XMLTV EPG files, provides channel management, implements HDHomeRun (HDHR) protocol, and handles stream buffering via FFmpeg/VLC.
 
+## Deployment
+
+**Important:** For deployment to Rancher, use the `deploy-xteve` skill. See: `/Users/sebastiaan.koetsier/.agents/skills/deploy-xteve/SKILL.md`
+
 ## Build & Run
 
 ```bash
-# Build
-go build xteve.go
+# Build all packages
+go build ./...
 
-# Run (default port 34400, config at ~/.xteve/)
-./xteve
-
-# Run with options
-./xteve -port 8080 -config /path/to/config -debug 2
-
-# Development mode (serves HTML/JS from local ./html/ instead of embedded)
-./xteve -dev
-
-# Restore from backup
-./xteve -restore /path/to/xteve_backup.zip
-```
-
-## Testing
-
-```bash
-# Run all tests
+# Run tests
 go test ./...
 
-# Run tests in a specific internal package
-go test ./src/internal/m3u-parser/
+# Run (default port 34400, config at ~/.xteve/)
+./cmd/xteve/xteve
 
-# Run a single test
-go test ./src/internal/m3u-parser/ -run TestName
+# Run with options
+./cmd/xteve/xteve -port 8080 -config /path/to/config -debug 2
 ```
-
-Tests only exist in `src/internal/m3u-parser/`.
-
-## TypeScript Frontend
-
-The web UI is written in TypeScript, located in `/ts/`. Compiled output goes to `/html/js/`.
-
-```bash
-cd ts && ./compileJS.sh
-```
-
-The compiled JS is committed to the repo — edit TypeScript sources, not the compiled output.
 
 ## Architecture
 
 ```
-xteve.go                  Entry point — parses flags, calls src/system.go init
-src/system.go             System initialization, folder/file creation, settings bootstrap
-src/webserver.go          HTTP server, all route handlers
-src/xepg.go               XEPG database, channel mapping, XMLTV generation
-src/m3u.go                M3U playlist parsing, filtering, channel ordering
-src/buffer.go             Stream buffering/re-streaming engine (uses FFmpeg/VLC)
-src/hdhr.go               HDHomeRun protocol endpoints
-src/data.go               Settings persistence, provider config, runtime data updates
-src/authentication.go     Auth middleware
-src/backup.go             Backup/restore logic
-src/internal/
-  authentication/         HMAC-SHA256 token auth
-  m3u-parser/             Reusable M3U parsing library (has tests)
-  imgcache/               Channel logo/EPG image caching
-  up2date/                GitHub-based auto-update
-html/                     Web UI assets (HTML templates, CSS, compiled JS)
-ts/                       TypeScript source for the web UI
+cmd/xteve/main.go       Entry point — initializes all packages
+internal/
+  api/                  REST handlers + WebSocket hub
+  auth/                 Optional bcrypt session auth
+  buffer/              Stream tuner slot management
+  config/              Settings load/save (JSON)
+  hdhr/                HDHomeRun discovery endpoints
+  m3u/                 M3U parsing + Channel type
+  source/              M3U/XMLTV source management + stream proxy
+  ssdp/                LAN SSDP advertisement
+  storage/             JSON file persistence
+  ui/                 go:embed wrapper for React build
+  xepg/              In-memory EPG database
+web/                   React 19 + TypeScript frontend (Vite build)
 ```
 
-## Key Data Structures (in `src/struct.go`)
+## Key Data Structures
 
-- **SystemStruct** — global runtime state (flags, folders, version, IPs)
-- **DataStruct** — runtime data (playlists, channels, filters, XEPG mapping)
-- **SettingsStruct** — user-editable config (port, auth, EPG source, FFmpeg/VLC paths, tuner limits)
+- **xepg.Entry** — channel with mapping metadata (ID, Channel, Enabled, CustomName, EPGChannel, ChannelNum)
+- **xepg.Program** — programme entry (Channel, Start, Stop, Title, Desc, Category, Icon, Episode)
+- **config.Settings** — user-editable config (Port, TunerCount, M3UURL, XMLTVURL, etc.)
+- **source.Manager** — orchestrates M3U refresh, XMLTV proxy, HDHR lineup sync
 
 ## HTTP Endpoints
 
 | Path | Purpose |
 |------|---------|
-| `/stream/<id>` | Stream buffering/proxy |
-| `/xmltv/` | XMLTV EPG delivery |
+| `/api/v1/status` | Server status |
+| `/api/v1/settings` | Get/update settings |
+| `/api/v1/channels` | List channels |
+| `/api/v1/channels/{id}` | Update channel |
+| `/api/v1/channels/{id}/mapping` | Set custom name, EPG channel, channel number |
+| `/api/v1/playlists/refresh` | Refresh M3U playlist |
+| `/api/v1/epg/refresh` | Refresh EPG from XMLTV |
+| `/api/v1/epg/programs?channel_id=X` | Get programmes for channel |
+| `/stream/{id}` | Stream proxy |
+| `/xmltv/` | XMLTV EPG proxy |
 | `/m3u/` | M3U playlist delivery |
-| `/api/` | JSON API (settings, channels, mapping) |
-| `/web/` | Web UI |
-| `/data/` | WebSocket for real-time updates |
-| `/images/` | Cached channel logos |
-| `/download/` | File downloads (backups, exports) |
 | `/discover.json`, `/lineup.json`, `/device.xml` | HDHomeRun discovery |
+| `/ws` | WebSocket for real-time updates |
 
 ## Configuration Storage
 
 Default location: `~/.xteve/`
 
-Key files: `settings.json`, `authentication.json`, `xepg.json`, `urls.json`, `pms.json`
+Key files: `settings.json`
 
-Subdirectories: `backup/`, `cache/`, `temp/`, `img-cache/`, `img-upload/`
+## React Frontend
+
+The web UI is in `/web/` (React 19 + TypeScript + Vite + Tailwind). The build is embedded into the Go binary via `go:embed` in `internal/ui/`.
+
+```bash
+cd web && npm install && npm run build
+```
+
+## Testing
+
+```bash
+go test ./...
+```

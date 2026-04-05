@@ -9,13 +9,13 @@ import (
 
 // Channel represents a single entry parsed from an M3U playlist.
 type Channel struct {
-	Name       string
-	TvgID      string
-	TvgName    string
-	TvgLogo    string
-	GroupTitle string
-	URL        string
-	Attrs      map[string]string // any additional attributes
+	Name       string            `json:"name"`
+	TvgID      string            `json:"tvg_id"`
+	TvgName    string            `json:"tvg_name"`
+	TvgLogo    string            `json:"tvg_logo"`
+	GroupTitle string            `json:"group_title"`
+	URL        string            `json:"url"`
+	Attrs      map[string]string `json:"attrs,omitempty"`
 }
 
 var (
