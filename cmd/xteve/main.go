@@ -16,9 +16,9 @@ import (
 	"xteve/internal/buffer"
 	"xteve/internal/config"
 	"xteve/internal/hdhr"
+	"xteve/internal/source"
 	"xteve/internal/ssdp"
 	"xteve/internal/storage"
-	"xteve/internal/source"
 	"xteve/internal/ui"
 	"xteve/internal/xepg"
 )
@@ -76,10 +76,11 @@ func main() {
 	sourceManager := source.NewManager(cfg, xepgDB, hdhrHandler, buf, publicBaseURL)
 
 	apiHandler := api.New(api.Config{
-		Storage:  store,
-		Settings: cfg,
-		XEPG:     xepgDB,
-		Buffer:   buf,
+		Storage:       store,
+		Settings:      cfg,
+		XEPG:          xepgDB,
+		Buffer:        buf,
+		SourceManager: sourceManager,
 		OnSettingsChanged: func(updated config.Settings) {
 			sourceManager.UpdateSettings(config.ApplyEnvOverrides(updated))
 			if err := sourceManager.RefreshPlaylist(context.Background()); err != nil {
