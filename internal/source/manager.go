@@ -170,13 +170,16 @@ func (m *Manager) ServeM3U(w http.ResponseWriter, r *http.Request) {
 			name = entry.CustomName
 		}
 
+		num := guideNumberWithIndex(entry, index)
+		// tvg-chno is what upstream Jellyfin reads for channel number; channel-number alone is ignored.
 		line := fmt.Sprintf(
-			"#EXTINF:-1 tvg-id=\"%s\" tvg-name=\"%s\" tvg-logo=\"%s\" group-title=\"%s\" channel-number=\"%s\",%s\n%s/stream/%s\n",
+			"#EXTINF:-1 tvg-id=\"%s\" tvg-name=\"%s\" tvg-logo=\"%s\" tvg-chno=\"%s\" group-title=\"%s\" channel-number=\"%s\",%s\n%s/stream/%s\n",
 			entry.Channel.TvgID,
 			name,
 			entry.Channel.TvgLogo,
+			num,
 			entry.Channel.GroupTitle,
-			guideNumberWithIndex(entry, index),
+			num,
 			name,
 			m.baseURL,
 			entry.ID,
@@ -211,13 +214,21 @@ func (m *Manager) ServeXMLTV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "failed to read xmltv body", http.StatusBadGateway)
+		return
+	}
+
+	body = stripChannelIconsFromXMLTV(body)
+
 	if contentType := resp.Header.Get("Content-Type"); contentType != "" {
 		w.Header().Set("Content-Type", contentType)
 	} else {
 		w.Header().Set("Content-Type", "application/xml")
 	}
 	w.WriteHeader(http.StatusOK)
-	_, _ = io.Copy(w, resp.Body)
+	_, _ = w.Write(body)
 }
 
 // ServeStream proxies an upstream channel stream while enforcing tuner limits.
